@@ -1,84 +1,148 @@
-import Image from "next/image";
-import { createClient } from "@/utils/supabase/server";
+"use client";
 
-export default async function Home() {
-  const supabase = await createClient();
+import { useEffect, useRef, useState } from "react";
 
-  const { data, error } = await supabase.from("Test").select("*").limit(5);
+import { buildFingerprint } from "@/utils/honeypot/fingerprint";
+
+/*
+ * Login falso del honeypot. Nunca autentica: siempre devuelve "credenciales
+ * inválidas" para inducir reintentos (credential stuffing). En cada submit
+ * envía credenciales + fingerprint + tiempo en página a /api/login.
+ */
+
+export default function LoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const mountedAt = useRef(0);
+
+  useEffect(() => {
+    mountedAt.current = Date.now();
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          password,
+          fingerprint: buildFingerprint(),
+          timing_ms: Date.now() - mountedAt.current,
+        }),
+      });
+    } catch {
+      // ignorar errores de red: igual mostramos el error genérico
+    }
+
+    // Pequeña demora para parecer un login real.
+    setTimeout(() => {
+      setLoading(false);
+      setPassword("");
+      setError("Usuario o contraseña incorrectos. Intentá nuevamente.");
+    }, 900);
+  }
 
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <div className="w-full max-w-md rounded-lg border border-black/[.08] p-4 text-left dark:border-white/[.145]">
-            <h2 className="mb-2 text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-              Supabase test query
-            </h2>
-            {error ? (
-              <pre className="overflow-auto text-sm text-red-600 dark:text-red-400">
-                {JSON.stringify(error, null, 2)}
-              </pre>
-            ) : (
-              <pre className="overflow-auto text-sm text-green-700 dark:text-green-400">
-                {JSON.stringify(data, null, 2)}
-              </pre>
-            )}
+    <div className="relative flex min-h-full flex-1 items-center justify-center bg-[#14171A] px-4 py-12 font-sans text-[#E7EAEE]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 80% at 50% 112%, rgba(125,160,192,0.10), transparent 58%)",
+        }}
+      />
+
+      <div className="relative w-full max-w-[400px]">
+        {/* marca */}
+        <div className="mb-9">
+          <div className="flex items-center gap-2.5">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
+              <path d="M7 2v11h3v9l7-12h-4l4-8z" fill="#F5C542" />
+            </svg>
+            <span className="font-display text-xl font-semibold tracking-tight">
+              Deuterio S.A.
+            </span>
           </div>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <p className="mt-1.5 text-xs text-[#8C95A0]">Portal Corporativo</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight">
+          Iniciá sesión
+        </h1>
+        <p className="mt-2 text-sm text-[#9AA3AD]">
+          Ingresá con tu usuario corporativo.
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="username" className="text-sm text-[#B4BCC6]">
+              Usuario
+            </label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autoComplete="username"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="rounded-lg border border-[#272C32] bg-[#0F1215] px-3.5 py-2.5 text-sm text-[#E7EAEE] outline-none transition-colors placeholder:text-[#5E6770] focus:border-[#6B8AA8] focus:ring-2 focus:ring-[#6B8AA8]/25"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="password" className="text-sm text-[#B4BCC6]">
+              Contraseña
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="rounded-lg border border-[#272C32] bg-[#0F1215] px-3.5 py-2.5 text-sm text-[#E7EAEE] outline-none transition-colors placeholder:text-[#5E6770] focus:border-[#6B8AA8] focus:ring-2 focus:ring-[#6B8AA8]/25"
+            />
+          </div>
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded-lg border border-[#5E3231] bg-[#211517] px-3.5 py-2.5 text-sm text-[#D9A2A0]"
+            >
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-2 rounded-lg bg-[#D7DEE6] px-4 py-2.5 text-sm font-semibold text-[#14171A] outline-none transition-colors hover:bg-[#E8EDF2] focus-visible:ring-2 focus-visible:ring-[#8FA8C2]/50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Documentation
-          </a>
+            {loading ? "Ingresando…" : "Ingresar"}
+          </button>
+        </form>
+
+        <a
+          href="/admin"
+          className="mt-5 inline-block text-sm text-[#9AA3AD] underline-offset-4 transition-colors hover:text-[#8FA8C2] hover:underline"
+        >
+          ¿Olvidaste tu contraseña?
+        </a>
+
+        <div className="mt-10 border-t border-[#20242A] pt-5 text-xs text-[#6B7480]">
+          Deuterio S.A. · Mesa de Ayuda interno 4357
         </div>
-      </main>
+      </div>
     </div>
   );
 }
